@@ -15,10 +15,11 @@
     "build:mac:arm": "npm run build && electron-builder --mac --arm64",
     "build:win": "npm run build && electron-builder --win",
     "build:all": "npm run build && electron-builder -mwl",
-    "build:linux": "npm run build && electron-builder --linux --x64",
+    "build:linux": "npm run build && electron-builder --linux --x64"
   },
   "dependencies": {
-    "@electron-toolkit/utils": "^4.0.0"
+    "@electron-toolkit/utils": "^4.0.0",
+    "uiohook-napi": "^1.5.5"
   },
   "devDependencies": {
     "@electron-toolkit/preload": "^3.0.2",

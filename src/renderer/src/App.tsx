@@ -116,6 +116,21 @@ export default function App(): JSX.Element {
         {formError ? <p className="error">{formError}</p> : null}
       </div>
 
+      {checkedIn && !currentBreak ? (
+        <div className="card">
+          {state.monitoringError ? (
+            <p className="error">{state.monitoringError}</p>
+          ) : (
+            <p className="sub">
+              Screen &amp; activity monitoring: {state.monitoringActive ? 'On' : 'Starting…'}
+              {state.lastSampleAt
+                ? ` · last capture ${new Date(state.lastSampleAt).toLocaleTimeString()}`
+                : ''}
+            </p>
+          )}
+        </div>
+      ) : null}
+
       <div className="row">
         {!checkedIn ? (
           <button disabled={busy} onClick={() => run(() => window.desktop.checkIn())}>

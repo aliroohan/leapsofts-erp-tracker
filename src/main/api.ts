@@ -167,4 +167,68 @@ export function isOnlineNow(): boolean {
   return net.isOnline()
 }
 
+export interface ActivitySamplePayload {
+  windowStart: string
+  capturedAt: string
+  keyboardPct: number
+  mousePct: number
+  combinedPct: number
+  imageBuffer: Buffer
+}
+
+/** Multipart upload — bypasses apiRequest's JSON-only Content-Type. */
+export async function uploadActivitySample(payload: ActivitySamplePayload): Promise<void> {
+  const token = loadAccessToken()
+  const form = new FormData()
+  form.set('windowStart', payload.windowStart)
+  form.set('capturedAt', payload.capturedAt)
+  form.set('keyboardPct', String(payload.keyboardPct))
+  form.set('mousePct', String(payload.mousePct))
+  form.set('combinedPct', String(payload.combinedPct))
+  form.set('image', new Blob([new Uint8Array(payload.imageBuffer)], { type: 'image/jpeg' }), 'sample.jpg')
+
+  const headers: Record<string, string> = {}
+  if (token) headers.Authorization = `Bearer ${token}`
+
+  let res: Response
+  try {
+    res = await session.defaultSession.fetch(`${apiBase()}/shifts/activity-samples`, {
+      method: 'POST',
+      headers,
+      body: form
+    })
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Network error'
+    throw new ApiError(message, 0)
+  }
+
+  if (res.status === 401) {
+    const next = await refreshAccessToken()
+    if (next) {
+      const retryHeaders: Record<string, string> = { Authorization: `Bearer ${next}` }
+      const retryForm = new FormData()
+      retryForm.set('windowStart', payload.windowStart)
+      retryForm.set('capturedAt', payload.capturedAt)
+      retryForm.set('keyboardPct', String(payload.keyboardPct))
+      retryForm.set('mousePct', String(payload.mousePct))
+      retryForm.set('combinedPct', String(payload.combinedPct))
+      retryForm.set('image', new Blob([new Uint8Array(payload.imageBuffer)], { type: 'image/jpeg' }), 'sample.jpg')
+      res = await session.defaultSession.fetch(`${apiBase()}/shifts/activity-samples`, {
+        method: 'POST',
+        headers: retryHeaders,
+        body: retryForm
+      })
+    }
+  }
+
+  if (!res.ok) {
+    const body = await parseBody(res)
+    const message =
+      (body.error && typeof body.error === 'object' && body.error.message) ||
+      body.message ||
+      `Upload failed (${res.status})`
+    throw new ApiError(String(message), res.status)
+  }
+}
+
 export { ApiError }

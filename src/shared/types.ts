@@ -43,6 +43,20 @@ export interface TrackerState {
   isOnline: boolean
   pendingCount: number
   lastError: string | null
+  monitoringActive: boolean
+  monitoringError: string | null
+  lastSampleAt: string | null
+}
+
+export interface PendingActivitySample {
+  id: string
+  windowStart: string
+  capturedAt: string
+  keyboardPct: number
+  mousePct: number
+  combinedPct: number
+  /** Absolute path to the JPEG screenshot on disk, queued for upload. */
+  imagePath: string
 }
 
 export const DEFAULT_IDLE_TIMEOUT_MINUTES = 5

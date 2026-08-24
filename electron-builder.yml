@@ -8,6 +8,7 @@ files:
   - package.json
 asarUnpack:
   - resources/**
+  - node_modules/uiohook-napi/**
 extraResources:
   - from: build/icon.png
     to: icon.png

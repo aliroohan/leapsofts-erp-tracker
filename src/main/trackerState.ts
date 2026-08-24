@@ -12,7 +12,10 @@ class StateHub extends EventEmitter {
     idleTimeoutMinutes: DEFAULT_IDLE_TIMEOUT_MINUTES,
     isOnline: true,
     pendingCount: 0,
-    lastError: null
+    lastError: null,
+    monitoringActive: false,
+    monitoringError: null,
+    lastSampleAt: null
   }
 
   get(): TrackerState {
@@ -55,6 +58,20 @@ class StateHub extends EventEmitter {
     this.patch({ lastError })
   }
 
+  setMonitoringActive(monitoringActive: boolean): void {
+    if (this.snapshot.monitoringActive === monitoringActive) return
+    this.patch({ monitoringActive })
+  }
+
+  setMonitoringError(monitoringError: string | null): void {
+    if (this.snapshot.monitoringError === monitoringError) return
+    this.patch({ monitoringError })
+  }
+
+  setLastSampleAt(lastSampleAt: string | null): void {
+    this.patch({ lastSampleAt })
+  }
+
   refreshPending(): void {
     this.patch({})
   }
@@ -68,7 +85,10 @@ class StateHub extends EventEmitter {
       idleTimeoutMinutes: DEFAULT_IDLE_TIMEOUT_MINUTES,
       isOnline: this.snapshot.isOnline,
       pendingCount: pendingCount(),
-      lastError: null
+      lastError: null,
+      monitoringActive: false,
+      monitoringError: this.snapshot.monitoringError,
+      lastSampleAt: this.snapshot.lastSampleAt
     }
     this.emit('change', this.get())
   }

@@ -1,4 +1,5 @@
 import { net, powerMonitor } from 'electron'
+import { flushPendingActivity, startActivityMonitor, stopActivityMonitor } from './activityMonitor'
 import {
   appendOpenInterval,
   closeOpenIntervals,
@@ -32,8 +33,19 @@ let activityStreak = 0
 let inFlight = false
 let wired = false
 
+function syncActivityMonitor(): void {
+  const { shift, isAuthenticated } = trackerState.get()
+  const shouldRun = isAuthenticated && isCheckedIn(shift) && !openBreakSource(shift)
+  if (shouldRun) {
+    startActivityMonitor()
+  } else {
+    stopActivityMonitor()
+  }
+}
+
 async function applyShift(shift: Shift | null): Promise<void> {
   trackerState.setShift(shift)
+  syncActivityMonitor()
 }
 
 function shouldRecordSleep(): boolean {
@@ -94,6 +106,7 @@ async function closeOpenAndFlush(endTime: string = new Date().toISOString()): Pr
   closeOpenIntervals(endTime)
   trackerState.refreshPending()
   await flushPendingQueue()
+  await flushPendingActivity()
 }
 
 async function refreshProfileAndShift(): Promise<void> {
@@ -106,6 +119,7 @@ async function refreshProfileAndShift(): Promise<void> {
 export async function bootstrapSession(): Promise<void> {
   if (!loadAccessToken()) {
     trackerState.reset()
+    stopActivityMonitor()
     return
   }
   try {
@@ -137,6 +151,7 @@ export async function login(email: string, password: string): Promise<void> {
 }
 
 export async function logout(): Promise<void> {
+  stopActivityMonitor()
   await logoutRemote()
   trackerState.reset()
 }
