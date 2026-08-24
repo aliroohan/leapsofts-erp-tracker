@@ -3,6 +3,12 @@ productName: Leapsofts ERP
 directories:
   output: dist
   buildResources: build
+# uiohook-napi must compile on the host OS and CPU. Default packaging is
+# host-arch only (see scripts/run-electron-builder.mjs). Do not use -mwl.
+# Intel DMG: Leapsofts ERP-<ver>-mac-x64.dmg  |  Apple Silicon: ...-mac-arm64.dmg
+beforeBuild: scripts/before-build.cjs
+nodeGypRebuild: false
+buildDependenciesFromSource: false
 files:
   - out/**/*
   - package.json
@@ -17,15 +23,13 @@ extraResources:
   - from: build/icon-tray@2x.png
     to: icon-tray@2x.png
 mac:
+  # Arch comes from CLI (--x64 / --arm64). Do not list both here: that ships a
+  # default x64 DMG without a suffix plus a separate -arm64 DMG, and the wrong
+  # one fails with "this application is not supported on this Mac".
   target:
-    - target: dmg
-      arch:
-        - x64
-        - arm64
-    - target: zip
-      arch:
-        - x64
-        - arm64
+    - dmg
+    - zip
+  artifactName: ${productName}-${version}-mac-${arch}.${ext}
   category: public.app-category.business
   icon: build/icon.icns
 win:

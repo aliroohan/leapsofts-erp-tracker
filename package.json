@@ -1,6 +1,6 @@
 {
   "name": "leapsofts-erp-desktop-app",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Leapsofts ERP desktop time tracker",
   "author": "aliroohan321@gmail.com",
   "main": "./out/main/index.js",
@@ -10,12 +10,12 @@
     "build": "electron-vite build",
     "preview": "electron-vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.node.json --composite false && tsc --noEmit -p tsconfig.web.json --composite false",
-    "build:mac": "npm run build && electron-builder --mac --x64 --arm64",
-    "build:mac:intel": "npm run build && electron-builder --mac --x64",
-    "build:mac:arm": "npm run build && electron-builder --mac --arm64",
-    "build:win": "npm run build && electron-builder --win",
-    "build:all": "npm run build && electron-builder -mwl",
-    "build:linux": "npm run build && electron-builder --linux --x64"
+    "build:mac": "npm run build && node scripts/run-electron-builder.mjs --mac",
+    "build:mac:intel": "npm run build && node scripts/run-electron-builder.mjs --mac --x64",
+    "build:mac:arm": "npm run build && node scripts/run-electron-builder.mjs --mac --arm64",
+    "build:win": "npm run build && node scripts/run-electron-builder.mjs --win",
+    "build:linux": "npm run build && node scripts/run-electron-builder.mjs --linux --x64",
+    "build:all": "npm run build && node scripts/run-electron-builder.mjs --host"
   },
   "dependencies": {
     "@electron-toolkit/utils": "^4.0.0",
