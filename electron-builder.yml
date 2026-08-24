@@ -17,8 +17,14 @@ extraResources:
     to: icon-tray@2x.png
 mac:
   target:
-    - dmg
-    - zip
+    - target: dmg
+      arch:
+        - x64
+        - arm64
+    - target: zip
+      arch:
+        - x64
+        - arm64
   category: public.app-category.business
   icon: build/icon.icns
 win:
@@ -26,6 +32,13 @@ win:
     - nsis
     - portable
   icon: build/icon.ico
+linux:
+  target:
+    - AppImage
+    - deb
+  category: Office
+  icon: build/icon.png
+  maintainer: aliroohan321@gmail.com
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
