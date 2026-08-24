@@ -1,0 +1,11 @@
+/// <reference types="vite/client" />
+
+import type { DesktopApi } from '@shared/desktopApi'
+
+declare global {
+  interface Window {
+    desktop: DesktopApi
+  }
+}
+
+export {}

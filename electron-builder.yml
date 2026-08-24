@@ -1,0 +1,31 @@
+appId: com.leapsofts.erpdesktop
+productName: Leapsofts ERP
+directories:
+  output: dist
+  buildResources: build
+files:
+  - out/**/*
+  - package.json
+asarUnpack:
+  - resources/**
+extraResources:
+  - from: build/icon.png
+    to: icon.png
+  - from: build/icon-tray.png
+    to: icon-tray.png
+  - from: build/icon-tray@2x.png
+    to: icon-tray@2x.png
+mac:
+  target:
+    - dmg
+    - zip
+  category: public.app-category.business
+  icon: build/icon.icns
+win:
+  target:
+    - nsis
+    - portable
+  icon: build/icon.ico
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
