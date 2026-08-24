@@ -34,8 +34,12 @@ win:
   icon: build/icon.ico
 linux:
   target:
-    - AppImage
-    - deb
+    - target: AppImage
+      arch:
+        - x64
+    - target: deb
+      arch:
+        - x64
   category: Office
   icon: build/icon.png
   maintainer: aliroohan321@gmail.com
