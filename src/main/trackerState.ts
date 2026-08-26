@@ -1,5 +1,5 @@
 import { EventEmitter } from 'node:events'
-import type { Shift, TrackerState, TrackerUser } from '@shared/types'
+import type { Shift, TrackerState, TrackerUser, TrackingSummary } from '@shared/types'
 import { DEFAULT_IDLE_TIMEOUT_MINUTES } from '@shared/types'
 import { pendingCount } from './pendingBreaks'
 
@@ -15,7 +15,8 @@ class StateHub extends EventEmitter {
     lastError: null,
     monitoringActive: false,
     monitoringError: null,
-    lastSampleAt: null
+    lastSampleAt: null,
+    trackingSummary: null
   }
 
   get(): TrackerState {
@@ -72,6 +73,18 @@ class StateHub extends EventEmitter {
     this.patch({ lastSampleAt })
   }
 
+  setTrackingSummary(trackingSummary: TrackingSummary | null): void {
+    const current = this.snapshot.trackingSummary
+    if (
+      current?.app === trackingSummary?.app &&
+      current?.domain === trackingSummary?.domain &&
+      current?.pendingSegments === trackingSummary?.pendingSegments
+    ) {
+      return
+    }
+    this.patch({ trackingSummary })
+  }
+
   refreshPending(): void {
     this.patch({})
   }
@@ -88,7 +101,8 @@ class StateHub extends EventEmitter {
       lastError: null,
       monitoringActive: false,
       monitoringError: this.snapshot.monitoringError,
-      lastSampleAt: this.snapshot.lastSampleAt
+      lastSampleAt: this.snapshot.lastSampleAt,
+      trackingSummary: null
     }
     this.emit('change', this.get())
   }

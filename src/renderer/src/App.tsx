@@ -128,6 +128,18 @@ export default function App(): JSX.Element {
                 : ''}
             </p>
           )}
+          {state.trackingSummary ? (
+            <p className="sub">
+              Recording:{' '}
+              {state.trackingSummary.app ?? 'no focused app'}
+              {state.trackingSummary.domain ? ` · ${state.trackingSummary.domain}` : ''}
+              {' · '}
+              {state.trackingSummary.pendingSegments} pending segment
+              {state.trackingSummary.pendingSegments === 1 ? '' : 's'}
+            </p>
+          ) : (
+            <p className="sub">Recording: waiting for window tracking…</p>
+          )}
         </div>
       ) : null}
 

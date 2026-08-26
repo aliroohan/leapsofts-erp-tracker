@@ -25,6 +25,8 @@ export interface TrackerUser {
   firstName?: string
   lastName?: string
   idleTimeoutMinutes?: number
+  monitorScreenshots?: boolean
+  monitorAppUsage?: boolean
 }
 
 export interface PendingBreak {
@@ -32,6 +34,32 @@ export interface PendingBreak {
   startTime: string
   endTime: string | null
   source: 'sleep' | 'idle'
+}
+
+export type UsagePlatform = 'macos' | 'windows' | 'linux'
+
+export interface AppUsageSegment {
+  /** uuid, backend idempotency key */
+  clientId: string
+  app: string
+  execName: string
+  title: string
+  /** Hostname only (no path, query, or hash). */
+  url: string | null
+  domain: string | null
+  startedAt: string
+  endedAt: string
+  /** Wall-clock focus time. */
+  durationSec: number
+  /** Seconds within the segment that saw keyboard or mouse input. */
+  activeSec: number
+  platform: UsagePlatform
+}
+
+export interface TrackingSummary {
+  app: string | null
+  domain: string | null
+  pendingSegments: number
 }
 
 export interface TrackerState {
@@ -46,6 +74,7 @@ export interface TrackerState {
   monitoringActive: boolean
   monitoringError: string | null
   lastSampleAt: string | null
+  trackingSummary: TrackingSummary | null
 }
 
 export interface PendingActivitySample {

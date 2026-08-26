@@ -1,5 +1,5 @@
 import { net, session } from 'electron'
-import type { BreakSource, Shift, TrackerUser } from '@shared/types'
+import type { AppUsageSegment, BreakSource, Shift, TrackerUser } from '@shared/types'
 import { clearAccessToken, loadAccessToken, saveAccessToken } from './tokenStore'
 
 const apiBase = (): string => {
@@ -229,6 +229,14 @@ export async function uploadActivitySample(payload: ActivitySamplePayload): Prom
       `Upload failed (${res.status})`
     throw new ApiError(String(message), res.status)
   }
+}
+
+export async function uploadAppUsage(segments: AppUsageSegment[]): Promise<void> {
+  if (!segments.length) return
+  await apiRequest('/shifts/app-usage', {
+    method: 'POST',
+    body: JSON.stringify({ segments })
+  })
 }
 
 export { ApiError }

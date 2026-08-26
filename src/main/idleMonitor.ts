@@ -1,6 +1,12 @@
 import { net, powerMonitor } from 'electron'
 import { flushPendingActivity, startActivityMonitor, stopActivityMonitor } from './activityMonitor'
 import {
+  closeOpenUsageSegment,
+  flushPendingAppUsage,
+  startAppUsageMonitor,
+  stopAppUsageMonitor
+} from './appUsageMonitor'
+import {
   appendOpenInterval,
   closeOpenIntervals,
   closedPendingBreaks,
@@ -33,17 +39,40 @@ let activityStreak = 0
 let inFlight = false
 let wired = false
 
+function wantsScreenshots(): boolean {
+  return trackerState.get().user?.monitorScreenshots !== false
+}
+
+function wantsAppUsage(): boolean {
+  return trackerState.get().user?.monitorAppUsage !== false
+}
+
 function syncActivityMonitor(): void {
   const { shift, isAuthenticated } = trackerState.get()
   const shouldRun = isAuthenticated && isCheckedIn(shift) && !openBreakSource(shift)
-  if (shouldRun) {
+  if (shouldRun && wantsScreenshots()) {
     startActivityMonitor()
   } else {
     stopActivityMonitor()
   }
+  if (shouldRun && wantsAppUsage()) {
+    startAppUsageMonitor()
+  } else {
+    stopAppUsageMonitor()
+  }
+}
+
+async function refreshMeQuietly(): Promise<void> {
+  try {
+    const user = await fetchMe()
+    trackerState.setUser(user)
+  } catch {
+    // Keep the last known profile if /users/me is briefly unavailable.
+  }
 }
 
 async function applyShift(shift: Shift | null): Promise<void> {
+  await refreshMeQuietly()
   trackerState.setShift(shift)
   syncActivityMonitor()
 }
@@ -103,10 +132,12 @@ async function flushPendingQueue(): Promise<void> {
 }
 
 async function closeOpenAndFlush(endTime: string = new Date().toISOString()): Promise<void> {
+  closeOpenUsageSegment()
   closeOpenIntervals(endTime)
   trackerState.refreshPending()
   await flushPendingQueue()
   await flushPendingActivity()
+  await flushPendingAppUsage()
 }
 
 async function refreshProfileAndShift(): Promise<void> {
@@ -120,6 +151,7 @@ export async function bootstrapSession(): Promise<void> {
   if (!loadAccessToken()) {
     trackerState.reset()
     stopActivityMonitor()
+    stopAppUsageMonitor()
     return
   }
   try {
@@ -152,6 +184,7 @@ export async function login(email: string, password: string): Promise<void> {
 
 export async function logout(): Promise<void> {
   stopActivityMonitor()
+  stopAppUsageMonitor()
   await logoutRemote()
   trackerState.reset()
 }
@@ -162,11 +195,17 @@ export async function userCheckIn(): Promise<void> {
 }
 
 export async function userCheckOut(): Promise<void> {
+  closeOpenUsageSegment()
+  await flushPendingActivity()
+  await flushPendingAppUsage()
   const shift = await checkOut()
   await applyShift(shift)
 }
 
 export async function userStartBreak(): Promise<void> {
+  closeOpenUsageSegment()
+  await flushPendingActivity()
+  await flushPendingAppUsage()
   const shift = await startBreak('manual')
   await applyShift(shift)
 }
@@ -263,7 +302,10 @@ export function wirePowerAndNetwork(): void {
   wired = true
 
   powerMonitor.on('suspend', () => {
+    closeOpenUsageSegment()
     recordSleepOrOfflineStart()
+    void flushPendingActivity()
+    void flushPendingAppUsage()
   })
 
   powerMonitor.on('resume', () => {

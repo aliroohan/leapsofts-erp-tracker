@@ -15,6 +15,7 @@ files:
 asarUnpack:
   - resources/**
   - node_modules/uiohook-napi/**
+  - node_modules/@miniben90/**
 extraResources:
   - from: build/icon.png
     to: icon.png
@@ -32,6 +33,10 @@ mac:
   artifactName: ${productName}-${version}-mac-${arch}.${ext}
   category: public.app-category.business
   icon: build/icon.icns
+  extendInfo:
+    NSAppleEventsUsageDescription: >-
+      Leapsofts ERP reads the active browser tab address to record work
+      activity during your shift.
 win:
   target:
     - nsis

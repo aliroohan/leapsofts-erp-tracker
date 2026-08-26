@@ -2,8 +2,9 @@ import { randomInt } from 'node:crypto'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { desktopCapturer } from 'electron'
-import { uIOhook } from 'uiohook-napi'
 import { isNetworkError, uploadActivitySample } from './api'
+import { flushPendingAppUsage } from './appUsageMonitor'
+import { ensureStarted as ensureInputActivityStarted, onTick, type InputTick } from './inputActivity'
 import {
   enqueueActivitySample,
   imageDir,
@@ -13,23 +14,17 @@ import {
 import { isCheckedIn, openBreakSource, trackerState } from './trackerState'
 
 const WINDOW_MS = 10 * 60 * 1000
-const TICK_MS = 1000
 const SCREENSHOT_WIDTH = 1280
 const SCREENSHOT_HEIGHT = 800
 const JPEG_QUALITY = 45
 
-let hookStarted = false
-let hookFailed = false
-
 let windowTimer: ReturnType<typeof setTimeout> | null = null
-let tickTimer: ReturnType<typeof setInterval> | null = null
 let captureTimer: ReturnType<typeof setTimeout> | null = null
 let flushTimer: ReturnType<typeof setInterval> | null = null
+let unsubscribeTick: (() => void) | null = null
 
 let running = false
-
-let keyEventsThisSecond = 0
-let mouseEventsThisSecond = 0
+let captureInFlight: Promise<void> | null = null
 
 interface ActiveWindow {
   windowStart: number
@@ -48,42 +43,8 @@ function shouldMonitor(): boolean {
   return !openBreakSource(shift)
 }
 
-function ensureHookStarted(): boolean {
-  if (hookStarted) return true
-  if (hookFailed) return false
-  try {
-    uIOhook.on('keydown', () => {
-      keyEventsThisSecond += 1
-    })
-    uIOhook.on('mousemove', () => {
-      mouseEventsThisSecond += 1
-    })
-    uIOhook.on('mousedown', () => {
-      mouseEventsThisSecond += 1
-    })
-    uIOhook.on('wheel', () => {
-      mouseEventsThisSecond += 1
-    })
-    uIOhook.start()
-    hookStarted = true
-    return true
-  } catch {
-    hookFailed = true
-    trackerState.setMonitoringError(
-      'Input monitoring unavailable — grant Accessibility/Input Monitoring permission in System Settings and restart the app.'
-    )
-    return false
-  }
-}
-
-function stopHook(): void {
-  if (!hookStarted) return
-  try {
-    uIOhook.stop()
-  } catch {
-    // ignore
-  }
-  hookStarted = false
+function alignedSlotStart(now: number = Date.now()): number {
+  return now - (now % WINDOW_MS)
 }
 
 async function captureScreenshotJpeg(): Promise<Buffer | null> {
@@ -117,10 +78,6 @@ async function captureScreenshotJpeg(): Promise<Buffer | null> {
 }
 
 function clearWindowTimers(): void {
-  if (tickTimer) {
-    clearInterval(tickTimer)
-    tickTimer = null
-  }
   if (captureTimer) {
     clearTimeout(captureTimer)
     captureTimer = null
@@ -128,31 +85,34 @@ function clearWindowTimers(): void {
 }
 
 async function takeScreenshotForWindow(win: ActiveWindow): Promise<void> {
-  const jpeg = await captureScreenshotJpeg()
-  if (!jpeg) return
-  win.screenshotTaken = true
+  const work = (async () => {
+    const jpeg = await captureScreenshotJpeg()
+    if (!jpeg) return
+    win.screenshotTaken = true
 
-  const dir = imageDir()
-  const fileName = `${win.windowStart}-${randomInt(1_000_000)}.jpg`
-  const filePath = join(dir, fileName)
+    const dir = imageDir()
+    const fileName = `${win.windowStart}-${randomInt(1_000_000)}.jpg`
+    const filePath = join(dir, fileName)
+    try {
+      writeFileSync(filePath, jpeg)
+    } catch {
+      return
+    }
+
+    ;(win as ActiveWindow & { imagePath?: string }).imagePath = filePath
+  })()
+
+  captureInFlight = work
   try {
-    writeFileSync(filePath, jpeg)
-  } catch {
-    return
+    await work
+  } finally {
+    if (captureInFlight === work) captureInFlight = null
   }
-
-  // Stash the path on the window so finishWindow can enqueue once totals are final.
-  ;(win as ActiveWindow & { imagePath?: string }).imagePath = filePath
 }
 
-function onSecondTick(): void {
+function onSecondTick({ keyUsed, mouseUsed }: InputTick): void {
   const win = activeWindow
   if (!win) return
-
-  const keyUsed = keyEventsThisSecond > 0
-  const mouseUsed = mouseEventsThisSecond > 0
-  keyEventsThisSecond = 0
-  mouseEventsThisSecond = 0
 
   win.secondsElapsed += 1
   if (keyUsed) win.keyboardSeconds += 1
@@ -160,7 +120,7 @@ function onSecondTick(): void {
   if (keyUsed || mouseUsed) win.combinedSeconds += 1
 
   if (!shouldMonitor()) {
-    closeCurrentWindowEarly()
+    void closeCurrentWindowEarly()
   }
 }
 
@@ -182,14 +142,22 @@ function enqueueFinishedWindow(win: ActiveWindow & { imagePath?: string }): void
   })
   trackerState.setLastSampleAt(capturedAt)
   void flushPendingActivity()
+  void flushPendingAppUsage()
 }
 
-function closeCurrentWindowEarly(): void {
+async function awaitCaptureThenEnqueue(win: ActiveWindow): Promise<void> {
+  if (captureInFlight) {
+    await captureInFlight
+  }
+  enqueueFinishedWindow(win as ActiveWindow & { imagePath?: string })
+}
+
+async function closeCurrentWindowEarly(): Promise<void> {
   const win = activeWindow
   clearWindowTimers()
   activeWindow = null
   if (win) {
-    enqueueFinishedWindow(win as ActiveWindow & { imagePath?: string })
+    await awaitCaptureThenEnqueue(win)
   }
   scheduleNextWindow()
 }
@@ -200,7 +168,11 @@ function startWindow(): void {
     return
   }
 
-  const windowStart = Date.now()
+  const now = Date.now()
+  const windowStart = alignedSlotStart(now)
+  const msIntoSlot = now % WINDOW_MS
+  const msUntilEnd = msIntoSlot === 0 ? WINDOW_MS : WINDOW_MS - msIntoSlot
+
   const win: ActiveWindow & { imagePath?: string } = {
     windowStart,
     secondsElapsed: 0,
@@ -211,8 +183,8 @@ function startWindow(): void {
   }
   activeWindow = win
 
-  const offsetSec = randomInt(600)
-  tickTimer = setInterval(onSecondTick, TICK_MS)
+  const remainingSec = Math.max(1, Math.floor(msUntilEnd / 1000))
+  const offsetSec = remainingSec <= 1 ? 0 : randomInt(remainingSec)
   captureTimer = setTimeout(() => {
     if (activeWindow === win) {
       void takeScreenshotForWindow(win)
@@ -220,12 +192,15 @@ function startWindow(): void {
   }, offsetSec * 1000)
 
   windowTimer = setTimeout(() => {
-    if (activeWindow !== win) return
-    clearWindowTimers()
-    activeWindow = null
-    enqueueFinishedWindow(win)
-    scheduleNextWindow()
-  }, WINDOW_MS)
+    void (async () => {
+      if (activeWindow !== win) return
+      clearWindowTimers()
+      activeWindow = null
+      await awaitCaptureThenEnqueue(win)
+      if (!running) return
+      startWindow()
+    })()
+  }, msUntilEnd)
 }
 
 function scheduleNextWindow(): void {
@@ -234,13 +209,23 @@ function scheduleNextWindow(): void {
     clearTimeout(windowTimer)
     windowTimer = null
   }
+  if (!shouldMonitor()) {
+    windowTimer = setTimeout(() => {
+      if (!running) return
+      startWindow()
+    }, 1000)
+    return
+  }
   const now = Date.now()
   const msIntoWindow = now % WINDOW_MS
-  const msUntilBoundary = WINDOW_MS - msIntoWindow
+  if (msIntoWindow === 0) {
+    startWindow()
+    return
+  }
   windowTimer = setTimeout(() => {
     if (!running) return
     startWindow()
-  }, msUntilBoundary)
+  }, WINDOW_MS - msIntoWindow)
 }
 
 export async function flushPendingActivity(): Promise<void> {
@@ -284,22 +269,27 @@ export async function flushPendingActivity(): Promise<void> {
 }
 
 export function startActivityMonitor(): void {
-  if (running) return
+  const hookOk = ensureInputActivityStarted()
+  if (running) {
+    trackerState.setMonitoringActive(hookOk)
+    return
+  }
   running = true
   trackerState.setMonitoringError(null)
-
-  const hookOk = ensureHookStarted()
   trackerState.setMonitoringActive(hookOk)
+  unsubscribeTick = onTick(onSecondTick)
 
-  scheduleNextWindow()
+  startWindow()
 
   if (!flushTimer) {
     flushTimer = setInterval(() => {
       void flushPendingActivity()
+      void flushPendingAppUsage()
     }, 60_000)
   }
 
   void flushPendingActivity()
+  void flushPendingAppUsage()
 }
 
 export function stopActivityMonitor(): void {
@@ -310,9 +300,13 @@ export function stopActivityMonitor(): void {
   }
   clearWindowTimers()
   if (activeWindow) {
-    enqueueFinishedWindow(activeWindow as ActiveWindow & { imagePath?: string })
+    const win = activeWindow
     activeWindow = null
+    void awaitCaptureThenEnqueue(win)
   }
-  stopHook()
+  if (unsubscribeTick) {
+    unsubscribeTick()
+    unsubscribeTick = null
+  }
   trackerState.setMonitoringActive(false)
 }

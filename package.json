@@ -1,6 +1,6 @@
 {
   "name": "leapsofts-erp-desktop-app",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Leapsofts ERP desktop time tracker",
   "author": "aliroohan321@gmail.com",
   "main": "./out/main/index.js",
@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "@electron-toolkit/utils": "^4.0.0",
+    "@miniben90/x-win": "^3.6.0",
     "uiohook-napi": "^1.5.5"
   },
   "devDependencies": {
