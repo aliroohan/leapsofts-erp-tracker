@@ -46,8 +46,9 @@ let polling = false
 let open: OpenSegment | null = null
 
 function shouldMonitor(): boolean {
-  const { shift, isAuthenticated } = trackerState.get()
+  const { shift, isAuthenticated, user } = trackerState.get()
   if (!isAuthenticated || !isCheckedIn(shift)) return false
+  if (user?.monitorAppUsage === false) return false
   return !openBreakSource(shift)
 }
 

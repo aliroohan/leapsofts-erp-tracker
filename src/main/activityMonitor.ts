@@ -38,8 +38,9 @@ interface ActiveWindow {
 let activeWindow: ActiveWindow | null = null
 
 function shouldMonitor(): boolean {
-  const { shift, isAuthenticated } = trackerState.get()
+  const { shift, isAuthenticated, user } = trackerState.get()
   if (!isAuthenticated || !isCheckedIn(shift)) return false
+  if (user?.monitorScreenshots === false) return false
   return !openBreakSource(shift)
 }
 

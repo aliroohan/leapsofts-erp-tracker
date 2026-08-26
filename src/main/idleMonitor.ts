@@ -66,6 +66,7 @@ async function refreshMeQuietly(): Promise<void> {
   try {
     const user = await fetchMe()
     trackerState.setUser(user)
+    syncActivityMonitor()
   } catch {
     // Keep the last known profile if /users/me is briefly unavailable.
   }

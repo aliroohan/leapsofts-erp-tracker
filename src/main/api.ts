@@ -101,17 +101,31 @@ export function isNetworkError(err: unknown): boolean {
   return false
 }
 
+function asTrackerUser(raw: TrackerUser | Record<string, unknown>): TrackerUser {
+  const u = raw as TrackerUser & { id?: string }
+  return {
+    _id: String(u._id ?? u.id ?? ''),
+    email: String(u.email ?? ''),
+    firstName: u.firstName,
+    lastName: u.lastName,
+    idleTimeoutMinutes: u.idleTimeoutMinutes,
+    monitorScreenshots: u.monitorScreenshots !== false,
+    monitorAppUsage: u.monitorAppUsage !== false
+  }
+}
+
 export async function login(email: string, password: string): Promise<TrackerUser> {
   const data = await apiRequest<{ accessToken: string; user: TrackerUser }>('/auth/login', {
     method: 'POST',
     body: JSON.stringify({ email, password })
   })
   saveAccessToken(data.accessToken)
-  return data.user
+  return asTrackerUser(data.user)
 }
 
 export async function fetchMe(): Promise<TrackerUser> {
-  return apiRequest<TrackerUser>('/users/me')
+  const me = await apiRequest<TrackerUser>('/users/me')
+  return asTrackerUser(me)
 }
 
 export async function fetchTodayShift(): Promise<Shift | null> {
