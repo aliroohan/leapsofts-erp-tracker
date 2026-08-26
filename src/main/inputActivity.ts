@@ -1,5 +1,6 @@
 import { systemPreferences } from 'electron'
 import { uIOhook } from 'uiohook-napi'
+import { inputMonitoringUnavailableMessage } from './linuxDesktop'
 import { trackerState } from './trackerState'
 
 const TICK_MS = 1000
@@ -69,9 +70,7 @@ export function ensureStarted(): boolean {
   if (hookStarted) return true
 
   if (!promptAccessibilityIfNeeded()) {
-    trackerState.setMonitoringError(
-      'Input monitoring unavailable — grant Accessibility/Input Monitoring permission in System Settings, then check in again.'
-    )
+    trackerState.setMonitoringError(inputMonitoringUnavailableMessage())
     return false
   }
 
@@ -82,9 +81,7 @@ export function ensureStarted(): boolean {
     trackerState.setMonitoringError(null)
     return true
   } catch {
-    trackerState.setMonitoringError(
-      'Input monitoring unavailable — grant Accessibility/Input Monitoring permission in System Settings, then check in again.'
-    )
+    trackerState.setMonitoringError(inputMonitoringUnavailableMessage())
     return false
   }
 }

@@ -12,6 +12,7 @@ import {
   removeActivitySample
 } from './pendingActivitySamples'
 import { isCheckedIn, openBreakSource, trackerState } from './trackerState'
+import { screenCaptureUnavailableMessage } from './linuxDesktop'
 
 const WINDOW_MS = 10 * 60 * 1000
 const SCREENSHOT_WIDTH = 1280
@@ -55,25 +56,19 @@ async function captureScreenshotJpeg(): Promise<Buffer | null> {
       thumbnailSize: { width: SCREENSHOT_WIDTH, height: SCREENSHOT_HEIGHT }
     })
     if (!sources.length) {
-      trackerState.setMonitoringError(
-        'Screen Recording permission is required — grant it in System Settings and restart the app.'
-      )
+      trackerState.setMonitoringError(screenCaptureUnavailableMessage())
       return null
     }
     const primary = sources[0]
     const thumb = primary.thumbnail
     if (thumb.isEmpty()) {
-      trackerState.setMonitoringError(
-        'Screen Recording permission is required — grant it in System Settings and restart the app.'
-      )
+      trackerState.setMonitoringError(screenCaptureUnavailableMessage())
       return null
     }
     const resized = thumb.resize({ width: SCREENSHOT_WIDTH })
     return resized.toJPEG(JPEG_QUALITY)
   } catch {
-    trackerState.setMonitoringError(
-      'Screen capture failed — grant Screen Recording permission in System Settings and restart the app.'
-    )
+    trackerState.setMonitoringError(screenCaptureUnavailableMessage())
     return null
   }
 }

@@ -27,6 +27,11 @@ import {
 } from './api'
 import { isCheckedIn, openBreakSource, trackerState } from './trackerState'
 import { loadAccessToken } from './tokenStore'
+import {
+  getCachedMutterIdleSeconds,
+  probeMutterIdleSeconds,
+  refreshMutterIdleSeconds
+} from './linuxDesktop'
 import type { Shift } from '@shared/types'
 
 const IDLE_POLL_MS = 2000
@@ -275,7 +280,9 @@ function onIdleTick(): void {
     void closeOpenAndFlush()
   }
 
-  const idleSeconds = powerMonitor.getSystemIdleTime()
+  refreshMutterIdleSeconds()
+  const mutterIdle = getCachedMutterIdleSeconds()
+  const idleSeconds = mutterIdle ?? powerMonitor.getSystemIdleTime()
   trackerState.setIdleSeconds(idleSeconds)
 
   if (idleSeconds < ACTIVITY_IDLE_THRESHOLD_SEC) {
@@ -295,7 +302,9 @@ function onIdleTick(): void {
 export function startIdleMonitor(): void {
   if (pollTimer) return
   pollTimer = setInterval(onIdleTick, IDLE_POLL_MS)
-  onIdleTick()
+  void probeMutterIdleSeconds().finally(() => {
+    onIdleTick()
+  })
 }
 
 export function wirePowerAndNetwork(): void {

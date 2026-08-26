@@ -1,5 +1,6 @@
 import { activeWindowAsync } from '@miniben90/x-win'
 import type { UsagePlatform } from '@shared/types'
+import { prepareLinuxWindowTracking, windowTrackingUnavailableMessage } from './linuxDesktop'
 
 export interface ActiveWindowSnapshot {
   app: string
@@ -15,7 +16,13 @@ export function currentPlatform(): UsagePlatform {
 }
 
 export async function getActiveWindow(): Promise<ActiveWindowSnapshot | null> {
-  const win = await activeWindowAsync()
+  await prepareLinuxWindowTracking()
+  let win: Awaited<ReturnType<typeof activeWindowAsync>>
+  try {
+    win = await activeWindowAsync()
+  } catch (err) {
+    throw new Error(windowTrackingUnavailableMessage(), { cause: err })
+  }
   if (!win) return null
 
   const info = win.info

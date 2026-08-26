@@ -13,6 +13,7 @@ import {
   userStartBreak,
   wirePowerAndNetwork
 } from './idleMonitor'
+import { prepareLinuxWindowTracking } from './linuxDesktop'
 import { trackerState } from './trackerState'
 import { createTray } from './tray'
 
@@ -103,6 +104,7 @@ app.whenReady().then(async () => {
   registerIpc()
   trackerState.on('change', pushState)
   wirePowerAndNetwork()
+  await prepareLinuxWindowTracking()
   createWindow()
   createTray(() => mainWindow)
   startIdleMonitor()

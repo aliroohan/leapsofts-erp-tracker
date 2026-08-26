@@ -118,9 +118,9 @@ async function poll(): Promise<void> {
     let snapshot: Awaited<ReturnType<typeof getActiveWindow>>
     try {
       snapshot = await getActiveWindow()
-    } catch {
+    } catch (err) {
       trackerState.setMonitoringError(
-        'Window tracking unavailable — grant Screen Recording and Automation permission in System Settings and restart the app.'
+        err instanceof Error ? err.message : 'Window tracking unavailable.'
       )
       closeOpenSegment()
       publishSummary()
@@ -132,6 +132,11 @@ async function poll(): Promise<void> {
       closeOpenSegment(now)
       publishSummary()
       return
+    }
+
+    const monitoringError = trackerState.get().monitoringError
+    if (monitoringError?.startsWith('Window tracking')) {
+      trackerState.setMonitoringError(null)
     }
 
     const sanitized = sanitizeUrl(snapshot.rawUrl)
